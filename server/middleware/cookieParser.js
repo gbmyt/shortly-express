@@ -2,16 +2,21 @@
 const parseCookies = (req, res, next) => {
 
   // parse req.headers.cookie, and then write parsed obj to req.cookies
-  if (req.headers.cookie) {
+  let cookie = req.headers.cookie;
+  if (cookie) {
     console.log('Cookie string', req.headers.cookie);
+    cookie.split('; ')
+      .map(cookie => {
+        return cookie.split('=');
+      })
+      .forEach(field => req.cookies[field[0]] = field[1]);
+
+    console.log('split array', req.cookies);
+    next();
   } else {
     console.log('No cookies found');
     next();
   }
-  // cookies: {
-  // shortlyid: '18ea4fb6ab3178092ce936c591ddbb90c99c9f66;'
-  // }
-  // console.log('parseCookies req', req);
 };
 
 module.exports = parseCookies;
