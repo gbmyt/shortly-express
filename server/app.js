@@ -1,11 +1,14 @@
 const express = require('express');
 const path = require('path');
+// const Auth = require('./middleware/auth');
 const utils = require('./lib/hashUtils');
 const partials = require('express-partials');
-const Auth = require('./middleware/auth');
 const models = require('./models');
-
 const app = express();
+
+const Auth = require('./middleware/auth');
+const cookieParser = require('./middleware/cookieParser');
+
 
 app.set('views', `${__dirname}/views`);
 app.set('view engine', 'ejs');
@@ -16,7 +19,10 @@ app.use(express.urlencoded({
 }));
 app.use(express.static(path.join(__dirname, '../public')));
 
+//using app.use to mount middleware functions in Express js
 
+app.use(cookieParser);
+app.use(Auth.createSession);
 
 app.get('/',
   (req, res) => {
@@ -94,17 +100,18 @@ app.post('/signup', (req, res, next) => {
 
   return models.Users.create(newUser)
     .then(ResultSetHeader => {
-      // console.log('sign up user exists', ResultSetHeader);
+      // console.log('ResultSetHeader', ResultSetHeader);
+      // Auth.createSession(req, res, next);
       res.redirect('/');
-    }).catch(err => {
+    })
+    .catch(err => {
       // console.log('Caught Error: ', err);
-      res.redirect('/signup'); // change to login eventually
+      res.redirect('/signup');
     });
 });
 
 app.post('/login', (req, res, next) => {
   // console.log('post login', req.body);
-
   return models.Users.get({
     username: req.body.username
   }).then((user) => {
