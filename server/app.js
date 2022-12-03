@@ -25,20 +25,44 @@ app.use(Auth.createSession);
 
 // Add a verifySession helper function to all server routes
 const verifySession = (req, res, next) => {
-  console.log('Is Logged In?', models.Sessions.isLoggedIn(req.session));
+  // console.log('Is Logged In?', models.Sessions.isLoggedIn(req.session));
+  console.log('Verify Session Log', req.session);
 
   // Determines if a session is associated with a logged in user.
   if (models.Sessions.isLoggedIn(req.session)) {
     // if logged in
     console.log('You are already logged in');
+    // console.log('Is logged in', req.session);
     // res.redirect('/');
     next();
   } else {
     // if not logged in, redirect to login
     // verify session
+    // console.log('REQUEST SESSION LOG', req.session);
+    console.log('Not logged in');
     res.redirect('/login');
   }
 };
+
+// ATTEMPTING TO IMPLEMENT VERIFYSESSION HERE
+app.get('/', verifySession, (req, res) => {
+  res.render('index');
+});
+// app.get('/', (req, res) => {
+//   verifySession(req, res, () => {
+//     res.render('index');
+//   });
+// });
+
+app.get('/login', (req, res) => {
+  res.render('login');
+});
+
+app.get('/create', (req, res) => {
+  verifySession(req, res, () => {
+    res.render('index');
+  });
+});
 
 // app.get('/', (req, res) => {
 //   var isLoggedIn = verifySession(req, res, () => {
@@ -62,23 +86,6 @@ const verifySession = (req, res, next) => {
 // app.get('/create', (req, res) => {
 //   res.render('index');
 // });
-
-// ATTEMPTING TO IMPLEMENT VERIFYSESSION HERE
-app.get('/', (req, res) => {
-  verifySession(req, res, () => {
-    res.render('index');
-  });
-});
-
-app.get('/login', (req, res) => {
-  res.render('login');
-});
-
-app.get('/create', (req, res) => {
-  verifySession(req, res, () => {
-    res.render('index');
-  });
-});
 
 app.get('/links',
   (req, res, next) => {
@@ -239,15 +246,15 @@ app.get('/logout', (req, res, next) => {
 /************************************************************/
 
 app.get('/:code', (req, res, next) => {
-  // console.log('Response Obj SHORTCODE', res);
+  // console.log('Response Obj SHORTCODE', res.request); // 2387f
 
   return models.Links.get({
       code: req.params.code
     })
     .tap(link => {
       if (!link) {
-        res.request.href = '/';
-        // throw new Error('Link does not exist');
+        // res.request.href = '/';
+        throw new Error('Link does not exist');
       }
       return models.Clicks.create({
         linkId: link.id

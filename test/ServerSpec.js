@@ -744,7 +744,7 @@ describe('', function() {
           if (error) { return done(error); }
 
           var currentLocation = res.request.href;
-          expect(currentLocation).to.equal('http://127.0.0.1:4568/');
+          expect(currentLocation).to.equal('http://127.0.0.1:4568/'); // http://127.0.0.1:4568/login
           done();
         });
       });

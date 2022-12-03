@@ -30,6 +30,7 @@ module.exports.createSession = (req, res, next) => {
         // console.log('Session', session);
 
         req.session = session;
+        console.log('Session?', req.session)
         //Express.js res.cookie() function is used to set the cookie name to value
         res.cookie('shortlyid', session.hash);
         // console.log('Response Obj', res);
