@@ -42,7 +42,7 @@ module.exports.createSession = (req, res, next) => {
       hash: req.cookies.shortlyid
     })
       .then(session => {
-        console.log('Session Exists Already Get', session);
+        // console.log('Session Exists Already Get', session);
 
         if (!session) {
           throw ('auth no session');

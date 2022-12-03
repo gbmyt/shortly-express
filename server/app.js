@@ -9,7 +9,6 @@ const app = express();
 const Auth = require('./middleware/auth');
 const cookieParser = require('./middleware/cookieParser');
 
-
 app.set('views', `${__dirname}/views`);
 app.set('view engine', 'ejs');
 app.use(partials());
@@ -25,56 +24,75 @@ app.use(cookieParser);
 app.use(Auth.createSession);
 
 // Add a verifySession helper function to all server routes
-// app.use((req, res, next) => {
-//   // Determines if a session is associated with a logged in user.
-//   if (models.Session.isLoggedin()) {
-//     res.redirect('/login');
-//   } else {
-//     console.log('Not Logged In');
-//     next();
-//   }
-// });
-
 const verifySession = (req, res, next) => {
   console.log('Is Logged In?', models.Sessions.isLoggedIn(req.session));
 
   // Determines if a session is associated with a logged in user.
   if (models.Sessions.isLoggedIn(req.session)) {
+    // if logged in
     console.log('You are already logged in');
-    res.redirect('/');
+    // res.redirect('/');
+    next();
   } else {
+    // if not logged in, redirect to login
     // verify session
     res.redirect('/login');
-    next();
   }
 };
 
-// app.use(verifySession);
+// app.get('/', (req, res) => {
+//   var isLoggedIn = verifySession(req, res, () => {
 
-app.get('/', (req, res) => {
-  res.render('index');
-});
-
-// app.get('/',
-//   (req, res) => {
-//     verifySession(req, res, ()=> res.render('index') );
 //   });
 
-app.get('/create',
-  (req, res) => {
+//   // <-- if true, allow them to access '/', else if not logged in we'll redirect them to the login page '/login'
+//   if (isLoggedIn) {
+//     res.render('index');
+//   } else {
+//     console.log('inside app.get else block ');
+//     res.render('login');
+//   }
+// });
+
+// app.get('/', (req, res) => {
+//   res.render('index');
+// });
+
+
+// app.get('/create', (req, res) => {
+//   res.render('index');
+// });
+
+// ATTEMPTING TO IMPLEMENT VERIFYSESSION HERE
+app.get('/', (req, res) => {
+  verifySession(req, res, () => {
     res.render('index');
   });
+});
+
+app.get('/login', (req, res) => {
+  res.render('login');
+});
+
+app.get('/create', (req, res) => {
+  verifySession(req, res, () => {
+    res.render('index');
+  });
+});
 
 app.get('/links',
   (req, res, next) => {
-    models.Links.getAll()
-      .then(links => {
-        res.status(200).send(links);
-      })
-      .error(error => {
-        res.status(500).send(error);
-      });
+    verifySession(req, res, () => {
+      models.Links.getAll()
+        .then(links => {
+          res.status(200).send(links);
+        })
+        .error(error => {
+          res.status(500).send(error);
+        });
+    });
   });
+
 
 app.post('/links',
   (req, res, next) => {
@@ -84,9 +102,7 @@ app.post('/links',
       return res.sendStatus(404);
     }
 
-    return models.Links.get({
-        url
-      })
+    return models.Links.get({ url })
       .then(link => {
         if (link) {
           throw link;
@@ -130,34 +146,32 @@ app.post('/signup', (req, res, next) => {
   };
 
   return models.Users.get(req.body.username)
-    .then(result =>{
+    .then(result => {
       console.log('CREATE result', result);
 
+      // Handle user already exists case
       if (result) {
         res.redirect('/signup');
       } else {
+        // If sign up attempt is legit, create new user record => users table
         return models.Users.create(newUser)
-          .then((user)=>{
+          .then((user) => {
+            // console.log('User Created', user);
+            // res.cookie('shortlyid', req.session.hash);
+            // console.log('Signup Method Req Obj', req);
+
             res.redirect('/');
-            return models.Sessions.update({ hash: req.session.hash }, { userId: user.insertId });
+            // Request obj has our hash stored on it, use that info to update our Sessions record with userId
+            return models.Sessions.update({
+              hash: req.session.hash
+            }, {
+              userId: user.insertId
+            });
           });
       }
     }).catch(() => {
       res.redirect('/signup');
     });
-
-  // return models.Users.create(newUser)
-  //   .then(result => {
-  //     console.log('new user result', result);
-  //     // Handle user already exists case
-  //     // If sign up attempt is legit, create new user record => users table
-  //     // Request obj has our hash stored on it, use that info to update our Sessions record with userId
-  //     // return models.Sessions.update({});
-  //     res.redirect('/');
-  //   })
-  //   .catch(err => {
-  //     res.redirect('/signup');
-  //   });
 });
 
 app.post('/login', (req, res, next) => {
@@ -178,7 +192,7 @@ app.post('/login', (req, res, next) => {
     if (models.Users.compare(req.body.password, user.password, user.salt)) {
       // add the user info to the session
 
-      console.log('POST LOGIN', req.session);
+      // console.log('POST LOGIN', req.session);
       models.Sessions.update({
         hash: req.session.hash
       }, {
@@ -197,6 +211,26 @@ app.post('/login', (req, res, next) => {
   });
 });
 
+// if user makes a request to logout
+// get session from sessions table and delete it
+// empty sessions/cookie object on our request
+app.get('/logout', (req, res, next) => {
+  // console.log('==> Request Logout');
+
+  return models.Sessions.delete({
+      hash: req.session.hash
+    })
+    .then(() => {
+      res.status(200).clearCookie('shortlyid');
+      res.redirect('/');
+    })
+    .catch(err => {
+      res.status(400).send(err);
+    });
+
+  // cookies: { 'shortlyId': '' }
+  // models.Sessions.create();
+});
 
 /************************************************************/
 // Handle the code parameter route last - if all other routes fail
@@ -205,14 +239,15 @@ app.post('/login', (req, res, next) => {
 /************************************************************/
 
 app.get('/:code', (req, res, next) => {
+  // console.log('Response Obj SHORTCODE', res);
 
   return models.Links.get({
       code: req.params.code
     })
     .tap(link => {
-
       if (!link) {
-        throw new Error('Link does not exist');
+        res.request.href = '/';
+        // throw new Error('Link does not exist');
       }
       return models.Clicks.create({
         linkId: link.id
@@ -223,9 +258,7 @@ app.get('/:code', (req, res, next) => {
         visits: link.visits + 1
       });
     })
-    .then(({
-      url
-    }) => {
+    .then(({ url }) => {
       res.redirect(url);
     })
     .error(error => {
