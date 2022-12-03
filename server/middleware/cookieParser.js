@@ -1,6 +1,6 @@
 // write a middleware function that will access the cookies on an incoming request, parse them into an object, and assign this object to a cookies property on the request.
 const parseCookies = (req, res, next) => {
-  console.log('Req obj', req);
+
   // parse req.headers.cookie, and then write parsed obj to req.cookies
   let cookie = req.headers.cookie;
   if (cookie) {

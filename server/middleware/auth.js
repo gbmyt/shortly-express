@@ -7,12 +7,12 @@ const Promise = require('bluebird');
 
 // session id
 module.exports.createSession = (req, res, next) => {
-  console.log('req', req);
+
   // when no cookies
-  if (!req.cookies.shortlyid) { // cookies: {}, Object.keys(req.cookies).length
+  if (!req.cookies.shortlyid) {
     // Generate a session with a unique hash
-    // use models.Sessions.create() --> Creates a new session. Within this function, a hash is randomly generated.
     console.log('Cookie doesn\'t exist');
+
     // store it the sessions database
     models.Sessions.create() // Returns a Promise
       .then(result => {
@@ -27,32 +27,35 @@ module.exports.createSession = (req, res, next) => {
         //   hash: '',
         //   userId: null
         // }
-        // console.log('hash', hash);
+        // console.log('Session', session);
 
         req.session = session;
         //Express.js res.cookie() function is used to set the cookie name to value
-        res.cookie('shortlyid', session.hash); // cookies: { shortlyid: '' }
+        res.cookie('shortlyid', session.hash);
         // console.log('Response Obj', res);
         next();
       });
 
   } else {
     // when a session already exists
-    models.Sessions.get({
+    return models.Sessions.get({
       hash: req.cookies.shortlyid
     })
       .then(session => {
-        // console.log('Session Get', session);
+        console.log('Session Exists Already Get', session);
 
-        if (session) {
+        if (!session) {
+          throw ('auth no session');
+        } else {
+          req.session = session;
+          next();
           // when sesion exists and valid
-          req.session = {
-            hash: session.hash,
-            userId: session.userId,
-            user: session.user
-          };
+          // req.session = {
+          //   hash: session.hash,
+          //   userId: session.userId,
+          //   user: session.user
+          // };
         }
-        next();
       }).catch(err => {
         return models.Sessions.create();
       })

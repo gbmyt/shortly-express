@@ -20,14 +20,45 @@ app.use(express.urlencoded({
 app.use(express.static(path.join(__dirname, '../public')));
 
 //using app.use to mount middleware functions in Express js
-
+// need to require first
 app.use(cookieParser);
 app.use(Auth.createSession);
 
-app.get('/',
-  (req, res) => {
-    res.render('index');
-  });
+// Add a verifySession helper function to all server routes
+// app.use((req, res, next) => {
+//   // Determines if a session is associated with a logged in user.
+//   if (models.Session.isLoggedin()) {
+//     res.redirect('/login');
+//   } else {
+//     console.log('Not Logged In');
+//     next();
+//   }
+// });
+
+const verifySession = (req, res, next) => {
+  console.log('Is Logged In?', models.Sessions.isLoggedIn(req.session));
+
+  // Determines if a session is associated with a logged in user.
+  if (models.Sessions.isLoggedIn(req.session)) {
+    console.log('You are already logged in');
+    res.redirect('/');
+  } else {
+    // verify session
+    res.redirect('/login');
+    next();
+  }
+};
+
+// app.use(verifySession);
+
+app.get('/', (req, res) => {
+  res.render('index');
+});
+
+// app.get('/',
+//   (req, res) => {
+//     verifySession(req, res, ()=> res.render('index') );
+//   });
 
 app.get('/create',
   (req, res) => {
@@ -54,8 +85,8 @@ app.post('/links',
     }
 
     return models.Links.get({
-      url
-    })
+        url
+      })
       .then(link => {
         if (link) {
           throw link;
@@ -98,27 +129,43 @@ app.post('/signup', (req, res, next) => {
     password: req.body.password
   };
 
-  return models.Users.create(newUser)
-    .then(ResultSetHeader => {
-      // console.log('ResultSetHeader', ResultSetHeader);
-      // Auth.createSession(req, res, next);
-      res.redirect('/');
-    })
-    .catch(err => {
-      // console.log('Caught Error: ', err);
+  return models.Users.get(req.body.username)
+    .then(result =>{
+      console.log('CREATE result', result);
+
+      if (result) {
+        res.redirect('/signup');
+      } else {
+        return models.Users.create(newUser)
+          .then((user)=>{
+            res.redirect('/');
+            return models.Sessions.update({ hash: req.session.hash }, { userId: user.insertId });
+          });
+      }
+    }).catch(() => {
       res.redirect('/signup');
     });
+
+  // return models.Users.create(newUser)
+  //   .then(result => {
+  //     console.log('new user result', result);
+  //     // Handle user already exists case
+  //     // If sign up attempt is legit, create new user record => users table
+  //     // Request obj has our hash stored on it, use that info to update our Sessions record with userId
+  //     // return models.Sessions.update({});
+  //     res.redirect('/');
+  //   })
+  //   .catch(err => {
+  //     res.redirect('/signup');
+  //   });
 });
 
 app.post('/login', (req, res, next) => {
-  // console.log('post login', req.body);
   return models.Users.get({
     username: req.body.username
   }).then((user) => {
     // models.Users.compare(attempted, password, salt) → {boolean}
     // Compares a password attempt with the previously stored password and salt.
-
-    // console.log('user undef?', user);
 
     // user will look like:
     // {
@@ -129,20 +176,26 @@ app.post('/login', (req, res, next) => {
     // }
 
     if (models.Users.compare(req.body.password, user.password, user.salt)) {
+      // add the user info to the session
+
+      console.log('POST LOGIN', req.session);
+      models.Sessions.update({
+        hash: req.session.hash
+      }, {
+        userId: user.id
+      }); // This doesn't work, Hashes Dont Match
+
       // for sucessful login, redirect to index page
       res.redirect('/');
     } else {
       // for failed login, redirect to login page
       res.redirect('/login');
     }
-
   }).catch(err => {
     // console.log('Caught login Error: ', err);
     res.redirect('/login');
   });
-
 });
-
 
 
 /************************************************************/
@@ -154,8 +207,8 @@ app.post('/login', (req, res, next) => {
 app.get('/:code', (req, res, next) => {
 
   return models.Links.get({
-    code: req.params.code
-  })
+      code: req.params.code
+    })
     .tap(link => {
 
       if (!link) {
